@@ -4,6 +4,18 @@ import os, subprocess
 APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 VENV_PYTHON = os.path.join(APP_DIR, 'venv', 'bin', 'python')
 
+# 私有仓库支持: 在 .env 里配 GIT_TOKEN=<github token> (不要放进仓库 URL)
+GIT_TOKEN = os.environ.get('GIT_TOKEN', '')
+
+
+def _git_url_with_token(url: str) -> str:
+    """把 token 注入 https URL: https://x-access-token:<token>@github.com/...
+    返回原 URL 用于展示, 实际命令用注入版。
+    """
+    if GIT_TOKEN and url.startswith('https://'):
+        return url.replace('https://', f'https://x-access-token:{GIT_TOKEN}@', 1)
+    return url
+
 
 def _run(cmd: str, timeout: int = 60):
     try:
@@ -14,6 +26,13 @@ def _run(cmd: str, timeout: int = 60):
         return r.returncode, r.stdout.strip(), r.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, '', 'timeout'
+
+
+def _run_auth(cmd: str, timeout: int = 60):
+    """带 token 认证的 git 命令 (若配置了 GIT_TOKEN)。"""
+    if GIT_TOKEN and 'git ' in cmd and 'github.com' in cmd:
+        cmd = cmd.replace('git ', 'git -c credential.helper= -c http.extraHeader="Authorization: Bearer ' + GIT_TOKEN + '" ', 1)
+    return _run(cmd, timeout)
 
 
 def _detect_branch() -> str:
@@ -48,7 +67,7 @@ def check_for_updates():
         return {'error': 'no_remote', 'has_update': False,
                 'hint': '请先在设置中配置 Git 仓库地址'}
 
-    rc, _, err = _run('git fetch origin --tags --force', timeout=120)
+    rc, _, err = _run_auth('git fetch origin --tags --force', timeout=120)
     if rc != 0:
         return {'error': 'fetch_failed', 'has_update': False, 'detail': err}
 
@@ -98,7 +117,7 @@ def apply_update():
         return True, 'already_latest'
 
     branch = info['branch']
-    rc, out, err = _run(f'git pull origin {branch} --ff-only', timeout=180)
+    rc, out, err = _run_auth(f'git pull origin {branch} --ff-only', timeout=180)
     if rc != 0:
         return False, f'pull failed: {err or out}'
 
