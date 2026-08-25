@@ -62,7 +62,7 @@ def set_remote(url: str):
 
 def check_for_updates():
     ensure_repo()
-    rc, _, remote_url = _run('git remote get-url origin')
+    rc, remote_url, _ = _run('git remote get-url origin')
     if rc != 0 or not remote_url:
         return {'error': 'no_remote', 'has_update': False,
                 'hint': '请先在设置中配置 Git 仓库地址'}
