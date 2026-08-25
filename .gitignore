@@ -8,3 +8,4 @@ __pycache__/
 .zcode/
 实训报告.md
 *.md.bak
+gh_login_out.txt
