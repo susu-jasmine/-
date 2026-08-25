@@ -1,0 +1,4 @@
+
+! First copy your one-time code: E070-0385
+Open this URL to continue in your web browser: https://github.com/login/device
+failed to authenticate via web browser: Post "https://github.com/login/oauth/access_token": read tcp 192.168.3.82:5025->20.205.243.166:443: wsarecv: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond.

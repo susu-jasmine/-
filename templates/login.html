@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-i18n-key="login_title">资产监控 // 访问</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<style>
+  body { display:flex; align-items:center; justify-content:center; min-height:100vh; overflow:hidden; }
+  #matrix { position:fixed; top:0; left:0; z-index:0; }
+
+  /* ---- Corner glow orbs ---- */
+  .orb { position:fixed; border-radius:50%; filter:blur(100px); z-index:0; pointer-events:none; opacity:0.15; }
+  .orb-cyan  { width:300px; height:300px; background:var(--cyan);  top:-80px; right:-80px; }
+  .orb-green { width:250px; height:250px; background:var(--text);  bottom:-60px; left:-60px; }
+  .orb-purple{ width:200px; height:200px; background:var(--purple); bottom:20%; right:10%; opacity:0.1; }
+
+  .login-card {
+    position:relative; z-index:1; width:440px; padding:44px 40px;
+    background: linear-gradient(145deg, rgba(10,15,24,0.95), rgba(14,20,32,0.95));
+    border: 1px solid var(--border-light);
+    box-shadow:
+      0 0 60px rgba(0,229,255,0.06),
+      0 0 120px rgba(0,255,65,0.04),
+      0 8px 32px rgba(0,0,0,0.5);
+    border-radius: 6px;
+    backdrop-filter: blur(16px);
+  }
+  .login-card::before {
+    content: '';
+    position: absolute; top:-1px; left:20px; right:20px; height:1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), var(--text), transparent);
+    opacity: 0.6;
+  }
+  .login-card h1 {
+    text-align:center; font-size:1.7rem; margin:0 0 10px;
+    background: linear-gradient(90deg, var(--cyan), var(--text), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: glitch 4s infinite;
+    letter-spacing: 2px;
+  }
+  .login-card .sub {
+    text-align:center; color: var(--cyan-dim); font-size:0.74rem;
+    margin-bottom:32px; letter-spacing:1px;
+  }
+  .field { margin-bottom:18px; }
+  .field label {
+    display:block; margin-bottom:4px; font-size:0.74rem;
+    color: var(--cyan-dim); text-transform:uppercase; letter-spacing:1.5px;
+  }
+  .field input { width:100%; padding:11px 14px; box-sizing:border-box; }
+  .login-card button { width:100%; margin-top:10px; padding:12px; font-size:0.88rem; }
+  #login-error {
+    color: var(--red); text-align:center; margin-top:16px;
+    font-size:0.82rem; min-height:22px;
+  }
+  .register-hint { text-align:center; margin-top:20px; font-size:0.78rem; color:var(--text-dim); }
+  .register-hint a { color: var(--cyan); cursor:pointer; text-decoration:none; transition: all var(--transition); }
+  .register-hint a:hover { color: var(--text); text-shadow: var(--glow-cyan); }
+</style>
+</head>
+<body>
+<div class="orb orb-cyan"></div>
+<div class="orb orb-green"></div>
+<div class="orb orb-purple"></div>
+<canvas id="matrix"></canvas>
+
+<div class="login-card">
+  <h1>[ AssetMonitor ]</h1>
+  <div class="sub" data-i18n="login_sub">v1.0 // 资产监控系统</div>
+
+  <form id="login-form">
+    <div class="field">
+      <label data-i18n="login_username">用户名</label>
+      <input type="text" id="username" placeholder="root" autocomplete="off" autofocus>
+    </div>
+    <div class="field">
+      <label data-i18n="login_passphrase">密码</label>
+      <input type="password" id="password" placeholder="········">
+    </div>
+    <button type="submit" class="btn-primary" data-i18n="login_btn">验证_</button>
+  </form>
+
+  <div id="login-error"></div>
+</div>
+
+<!-- Language toggle rendered by i18n.js -->
+<script src="/static/js/i18n.js"></script>
+<script>
+(function() {
+  // ---------- Matrix rain ----------
+  const canvas = document.getElementById('matrix');
+  const ctx = canvas.getContext('2d');
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789<>[]{}|/\\:;';
+  const fontSize = 14;
+  let columns = Math.floor(canvas.width / fontSize);
+  let drops = [];
+  function initDrops() {
+    columns = Math.floor(canvas.width / fontSize);
+    drops = Array(columns).fill(0).map(() => Math.random() * -100);
+  }
+  initDrops();
+  window.addEventListener('resize', initDrops);
+
+  function draw() {
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#0f0';
+    ctx.font = fontSize + 'px monospace';
+    for (let i = 0; i < drops.length; i++) {
+      const text = chars[Math.floor(Math.random() * chars.length)];
+      const x = i * fontSize;
+      const y = drops[i] * fontSize;
+      ctx.fillStyle = y > canvas.height * 0.7 ? '#005500' : '#00cc00';
+      ctx.fillText(text, x, y);
+      if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    }
+  }
+  setInterval(draw, 40);
+
+  // ---------- Login ----------
+  const API = '';
+  const errEl = document.getElementById('login-error');
+
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    if (!username || !password) {
+      errEl.textContent = I18N.get('login_err_empty');
+      return;
+    }
+    errEl.textContent = I18N.get('login_err_auth');
+    try {
+      const resp = await fetch(API + '/api/auth/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password}),
+      });
+      const data = await resp.json();
+      if (!resp.ok) { errEl.textContent = '> ' + (data.error || 'Login failed'); return; }
+      localStorage.setItem('jwt', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      window.location.href = '/dashboard';
+    } catch (ex) {
+      errEl.textContent = I18N.get('login_err_net') + ex.message;
+    }
+  });
+
+  // ---------- Init i18n ----------
+  I18N.init();
+})();
+</script>
+</body>
+</html>

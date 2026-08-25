@@ -1,0 +1,10 @@
+data/
+logs/
+venv/
+__pycache__/
+*.pyc
+.env
+*.db
+.zcode/
+实训报告.md
+*.md.bak

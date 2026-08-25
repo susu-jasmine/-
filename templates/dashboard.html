@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-i18n-key="dashboard_title">资产监控 // 仪表盘</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="dashboard">
+<div class="scanlines"></div>
+
+<!-- Top Nav -->
+<nav class="top-nav">
+  <span class="logo">[ AssetMonitor // v1.0 ]</span>
+  <span class="nav-links">
+    <a href="#" data-section="domains" class="active" data-i18n="nav_domains">域名</a>
+    <a href="#" data-section="assets" data-i18n="nav_assets">全部资产</a>
+    <a href="#" data-section="logs" data-i18n="nav_logs">扫描日志</a>
+    <a href="#" data-section="settings" data-i18n="nav_settings">设置</a>
+    <a href="#" data-section="src" data-i18n="nav_src">SRC监控</a>
+    <a href="#" data-section="bounty" data-i18n="bounty_token_title">雷神众测</a>
+    <a href="#" data-section="zc" data-i18n="zc_title">360众测</a>
+    <span id="lang-toggle-container"></span>
+    <a href="#" id="logout-btn" data-i18n="nav_logout">[ 登出 ]</a>
+  </span>
+</nav>
+
+<main>
+  <!-- Stats bar -->
+  <section id="stats-bar">
+    <div class="stat-card">
+      <span class="stat-num" id="stat-domains">0</span>
+      <span class="stat-label" data-i18n="stat_domains">域名</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num" id="stat-assets">0</span>
+      <span class="stat-label" data-i18n="stat_total">总资产</span>
+    </div>
+    <div class="stat-card highlight">
+      <span class="stat-num" id="stat-new">0</span>
+      <span class="stat-label" data-i18n="stat_new">新资产</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num" id="stat-today">0</span>
+      <span class="stat-label" data-i18n="stat_today">今日发现</span>
+    </div>
+    <div class="stat-card src-stat">
+      <span class="stat-num" id="stat-src-new">0</span>
+      <span class="stat-label" data-i18n="stat_src_new">SRC新企业</span>
+    </div>
+  </section>
+
+  <!-- ======================== Domains Section ======================== -->
+  <section id="section-domains" class="content-section">
+    <div class="section-header">
+      <h2 data-i18n="domain_title">// 域名管理</h2>
+      <div class="add-domain-row">
+        <input type="text" id="new-domain" data-i18n-placeholder="domain_input_ph" placeholder="example.com" style="width:180px;">
+        <input type="text" id="new-org" data-i18n-placeholder="domain_org_ph" placeholder="所属单位" style="width:120px;">
+        <input type="number" id="new-interval" data-i18n-placeholder="domain_interval" placeholder="扫描间隔(h)" value="6" min="1" max="168" style="width:90px;">
+        <button class="btn-primary" id="add-domain-btn" data-i18n="domain_add_btn">添加域名</button>
+        <button class="btn-secondary btn-sm" id="show-batch-btn" data-i18n="domain_batch_btn">批量导入</button>
+      </div>
+    </div>
+    <!-- Batch import row -->
+    <div id="batch-import-row" style="display:none; margin-bottom:14px; padding:14px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius);">
+      <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+        <div class="field" style="margin:0;">
+          <label data-i18n="domain_org_label">所属单位</label>
+          <input type="text" id="batch-org" placeholder="例: 京东集团" style="width:200px;">
+        </div>
+        <div class="field" style="margin:0;">
+          <label data-i18n="domain_batch_label">域名列表 (每行一个)</label>
+          <textarea id="batch-domains" rows="4" style="width:380px; background:var(--bg); border:1px solid var(--border); color:var(--text); font-family:var(--font); font-size:0.8rem; padding:8px;" placeholder="jd.com&#10;taobao.com&#10;baidu.com"></textarea>
+        </div>
+        <div class="field" style="margin:0;">
+          <label data-i18n="domain_interval_label">扫描间隔(h)</label>
+          <input type="number" id="batch-interval" value="6" min="1" max="168" style="width:80px;">
+        </div>
+        <button class="btn-primary btn-sm" id="batch-import-btn" data-i18n="domain_batch_run">执行导入</button>
+      </div>
+      <div id="batch-result" style="margin-top:8px;font-size:0.78rem;"></div>
+    </div>
+    <!-- Organization filter -->
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+      <span data-i18n="domain_filter_org" style="font-size:0.75rem;color:var(--text-dim);">筛选单位:</span>
+      <select id="org-filter" style="background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--font);padding:5px 8px;font-size:0.75rem;">
+        <option value="">全部</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" id="domains-table">
+        <thead>
+          <tr>
+            <th data-i18n="domain_th_domain" data-sort="domain">域名</th>
+            <th data-i18n="domain_th_org" data-sort="organization">单位</th>
+            <th data-i18n="domain_th_status" data-sort="status">状态</th>
+            <th data-i18n="domain_th_assets" data-sort="asset_count">资产</th>
+            <th data-i18n="domain_th_new">新增</th>
+            <th data-i18n="domain_th_interval" data-sort="interval_hours">间隔</th>
+            <th data-i18n="domain_th_scan" data-sort="last_scan_at">上次扫描</th>
+            <th data-i18n="domain_th_actions">操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ======================== Assets Section ======================== -->
+  <section id="section-assets" class="content-section" style="display:none;">
+    <div class="section-header">
+      <h2 data-i18n="asset_title">// 全部资产</h2>
+      <div class="action-row">
+        <input type="text" id="asset-search" data-i18n-placeholder="asset_search_ph" placeholder="搜索子域名..." style="width:200px;">
+        <label class="check-label"><input type="checkbox" id="asset-new-only"><span data-i18n="asset_new_only">仅新资产</span></label>
+        <button class="btn-secondary btn-sm" id="mark-all-btn" data-i18n="asset_mark_all">全部标记已读</button>
+        <button class="btn-secondary btn-sm" id="export-csv-btn" data-i18n="asset_export_csv">导出CSV</button>
+        <button class="btn-secondary btn-sm" id="export-json-btn" data-i18n="asset_export_json">导出JSON</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" id="assets-table">
+        <thead>
+          <tr>
+            <th data-i18n="asset_th_sub" data-sort="subdomain">子域名</th>
+            <th data-i18n="asset_th_root">根域名</th>
+            <th data-i18n="asset_th_ip" data-sort="ip_addresses">IP</th>
+            <th data-i18n="asset_th_source" data-sort="source">来源</th>
+            <th data-i18n="asset_th_first" data-sort="first_seen">首次发现</th>
+            <th data-i18n="asset_th_status">状态</th>
+            <th data-i18n="asset_th_action">操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="assets-pager"></div>
+  </section>
+
+  <!-- ======================== Logs Section ======================== -->
+  <section id="section-logs" class="content-section" style="display:none;">
+    <div class="section-header"><h2 data-i18n="log_title">// 扫描日志</h2></div>
+    <div class="table-wrap">
+      <table class="data-table" id="logs-table">
+        <thead>
+          <tr>
+            <th data-i18n="log_th_domain">域名</th>
+            <th data-i18n="log_th_started" data-sort="started_at">开始时间</th>
+            <th data-i18n="log_th_finished" data-sort="finished_at">结束时间</th>
+            <th data-i18n="log_th_found" data-sort="assets_found">发现</th>
+            <th data-i18n="log_th_new" data-sort="new_assets_found">新增</th>
+            <th data-i18n="log_th_status" data-sort="status">状态</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="logs-pager"></div>
+  </section>
+
+  <!-- ======================== SRC Programs Section ======================== -->
+  <section id="section-src" class="content-section" style="display:none;">
+    <div class="section-header">
+      <h2 data-i18n="src_title">// SRC平台监控</h2>
+      <div class="action-row">
+        <button class="btn-primary btn-sm" id="src-scan-btn" data-i18n="src_scan_now">立即扫描</button>
+        <input type="text" id="src-search" data-i18n-placeholder="src_search_ph" placeholder="搜索企业..." style="width:200px;">
+        <label class="check-label"><input type="checkbox" id="src-new-only"><span data-i18n="asset_new_only">仅新上</span></label>
+        <select id="src-platform-filter" style="background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--font);padding:6px 8px;font-size:0.8rem;">
+          <option value="" data-i18n="src_all_platforms">全部平台</option>
+          <option value="butian">补天 Butian</option>
+          <option value="vulbox">漏洞盒子 Vulbox</option>
+        </select>
+        <button class="btn-secondary btn-sm" id="src-mark-all-btn" data-i18n="asset_mark_all">全部标记已读</button>
+        <button class="btn-secondary btn-sm" id="src-export-csv-btn" data-i18n="asset_export_csv">导出CSV</button>
+      </div>
+    </div>
+    <div id="src-stats-mini" style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;"></div>
+    <div class="table-wrap">
+      <table class="data-table" id="src-table">
+        <thead>
+          <tr>
+            <th data-i18n="src_th_platform" data-sort="platform">平台</th>
+            <th data-i18n="src_th_company" data-sort="company_name">企业</th>
+            <th data-i18n="src_th_reward" data-sort="reward_max">奖金范围</th>
+            <th data-i18n="src_th_desc">描述</th>
+            <th data-i18n="src_th_update" data-sort="change_time">更新时间</th>
+            <th data-i18n="src_th_status">状态</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="src-pager"></div>
+  </section>
+
+  <!-- ======================== BountyTeam Section ======================== -->
+  <section id="section-bounty" class="content-section" style="display:none;">
+    <div class="section-header">
+      <h2 data-i18n="bounty_title">// 雷神众测 · 抢名额监控</h2>
+      <div class="action-row">
+        <button class="btn-primary btn-sm" id="bounty-scan-btn" data-i18n="bounty_scan_now">立即扫描</button>
+        <input type="text" id="bounty-search" data-i18n-placeholder="bounty_search_ph" placeholder="搜索项目..." style="width:200px;">
+        <label class="check-label"><input type="checkbox" id="bounty-open-only" checked><span data-i18n="bounty_open_only">仅可报名</span></label>
+        <label class="check-label"><input type="checkbox" id="bounty-new-only"><span data-i18n="bounty_new_only">仅新增</span></label>
+        <button class="btn-secondary btn-sm" id="bounty-mark-all-btn" data-i18n="bounty_mark_all">全部标记已读</button>
+      </div>
+    </div>
+    <div id="bounty-stats-mini" style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;"></div>
+    <div class="table-wrap">
+      <table class="data-table" id="bounty-table">
+        <thead>
+          <tr>
+            <th data-i18n="bounty_th_name" data-sort="name">项目</th>
+            <th data-i18n="bounty_th_reward" data-sort="reward_max">奖金(元)</th>
+            <th data-i18n="bounty_th_remain">剩余名额</th>
+            <th data-i18n="bounty_th_surplus" data-sort="surplus">剩余天数</th>
+            <th data-i18n="bounty_th_state" data-sort="startime">开始时间</th>
+            <th data-i18n="bounty_th_seen">状态</th>
+            <th data-i18n="bounty_th_apply_status">报名</th>
+            <th data-i18n="bounty_th_action">操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="bounty-pager"></div>
+  </section>
+
+  <!-- ======================== 360众测 Section ======================== -->
+  <section id="section-zc" class="content-section" style="display:none;">
+    <div class="section-header">
+      <h2 data-i18n="zc_title">// 360众测 · 项目监控</h2>
+      <div class="action-row">
+        <button class="btn-primary btn-sm" id="zc-scan-btn" data-i18n="zc_scan_now">立即扫描</button>
+        <input type="text" id="zc-search" data-i18n-placeholder="zc_search_ph" placeholder="搜索项目..." style="width:200px;">
+        <label class="check-label"><input type="checkbox" id="zc-open-only" checked><span data-i18n="zc_open_only">仅开放</span></label>
+        <label class="check-label"><input type="checkbox" id="zc-new-only"><span data-i18n="zc_new_only">仅新增</span></label>
+        <button class="btn-secondary btn-sm" id="zc-mark-all-btn" data-i18n="zc_mark_all">全部标记已读</button>
+      </div>
+    </div>
+    <div id="zc-stats-mini" style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;"></div>
+    <div class="table-wrap">
+      <table class="data-table" id="zc-table">
+        <thead>
+          <tr>
+            <th data-i18n="zc_th_name" data-sort="name">项目</th>
+            <th data-i18n="zc_th_reward" data-sort="reward_max">奖金(元)</th>
+            <th data-i18n="zc_th_surplus" data-sort="surplus">剩余天数</th>
+            <th data-i18n="zc_th_state" data-sort="startime">开始时间</th>
+            <th data-i18n="zc_th_seen">状态</th>
+            <th data-i18n="zc_th_apply">报名</th>
+            <th data-i18n="zc_th_action">操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="zc-pager"></div>
+  </section>
+
+  <!-- ======================== Settings Section ======================== -->
+  <section id="section-settings" class="content-section" style="display:none;">
+    <div class="section-header"><h2 data-i18n="settings_title">// 通知设置</h2></div>
+    <div style="max-width:640px;">
+      <div class="settings-group">
+        <h3 data-i18n="settings_pushplus_title">微信推送 (PushPlus)</h3>
+        <p class="hint" data-i18n="settings_pushplus_hint">关注 PushPlus 公众号获取 token → pushplus.plus</p>
+        <div class="field">
+          <label data-i18n="settings_pushplus_label">PushPlus Token</label>
+          <input type="text" id="s-pushplus" data-i18n-placeholder="settings_pushplus_ph" placeholder="你的32位token" style="width:100%;">
+        </div>
+        <label class="check-label"><input type="checkbox" id="s-notify-wechat"><span data-i18n="settings_wechat_enable">启用微信推送</span></label>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_email_title">邮件通知</h3>
+        <div class="field"><label data-i18n="settings_email_label">Email</label><input type="email" id="s-email" data-i18n-placeholder="settings_email_ph" placeholder="you@example.com" style="width:100%;"></div>
+        <div class="field"><label data-i18n="settings_smtp_host">SMTP 服务器</label><input type="text" id="s-smtp-host" placeholder="smtp.qq.com" style="width:100%;"></div>
+        <div class="field"><label data-i18n="settings_smtp_port">SMTP 端口</label><input type="number" id="s-smtp-port" value="587" style="width:100%;"></div>
+        <div class="field"><label data-i18n="settings_smtp_user">SMTP 用户名</label><input type="text" id="s-smtp-user" placeholder="you@qq.com" style="width:100%;"></div>
+        <div class="field"><label data-i18n="settings_smtp_pass">SMTP 密码(授权码)</label><input type="password" id="s-smtp-pass" placeholder="授权码" style="width:100%;"></div>
+        <div class="field"><label data-i18n="settings_smtp_from">发件人地址</label><input type="email" id="s-smtp-from" placeholder="you@qq.com" style="width:100%;"></div>
+        <label class="check-label"><input type="checkbox" id="s-notify-email"><span data-i18n="settings_email_enable">启用邮件通知</span></label>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_src_title">SRC监控频率</h3>
+        <div class="field">
+          <label data-i18n="settings_src_interval">扫描间隔 (小时)</label>
+          <input type="number" id="s-src-interval" value="1" min="1" max="168" style="width:100%;">
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="settings_bounty_title">雷神众测监控</h3>
+        <div class="field">
+          <label data-i18n="bounty_token_label">BountyTeam Token (jwtToken)</label>
+          <input type="text" id="s-bounty-token" placeholder="648db335-..." style="width:100%;">
+          <p class="hint" data-i18n="bounty_token_hint">登录 bountyteam.com 后，控制台执行 localStorage.getItem("jwtToken")</p>
+        </div>
+        <div class="field">
+          <label data-i18n="bounty_interval">扫描间隔 (分钟, 1-60)</label>
+          <input type="number" id="s-bounty-interval" value="3" min="1" max="60" style="width:100%;">
+        </div>
+        <div class="field">
+          <label class="check-label" style="font-weight:600;">
+            <input type="checkbox" id="s-bounty-auto-apply">
+            <span data-i18n="bounty_auto_apply">自动报名 (检测到新项目立即调用平台报名接口)</span>
+          </label>
+          <p class="hint" data-i18n="bounty_auto_apply_hint">用你的账号对每个新检测到的可报名项目自动点击报名；失败原因会推送到微信/邮件。需账号已完成实名/认证，否则平台会拒绝。</p>
+        </div>
+        <div class="field">
+          <label class="check-label" style="font-weight:600;">
+            <input type="checkbox" id="s-bounty-fast-poll">
+            <span data-i18n="bounty_fast_poll">极速模式 (秒级轮询)</span>
+          </label>
+          <p class="hint" data-i18n="bounty_fast_poll_hint">用独立守护线程按秒级间隔扫描并立即报名。间隔越小越快，但持续高频请求可能触发平台风控限流/封禁，建议 2-3 秒。关闭后恢复分钟级扫描。</p>
+        </div>
+        <div class="field">
+          <label data-i18n="bounty_poll_seconds">极速轮询间隔 (秒, 1-60)</label>
+          <input type="number" id="s-bounty-poll-seconds" value="3" min="1" max="60" style="width:100%;">
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="zc_settings_title">360众测监控</h3>
+        <div class="field">
+          <label data-i18n="zc_cookie_label">360众测 Cookie (完整登录 Cookie)</label>
+          <textarea id="s-zc-cookie" rows="2" placeholder="Qs_lvt_xxx=...; Qs_pv_xxx=..." style="width:100%;"></textarea>
+          <p class="hint" data-i18n="zc_cookie_hint">浏览器登录 zhongce.360.net 后，F12 → Network → 任意请求 → 复制 Cookie 请求头的完整值（注意保持分号分隔格式）。</p>
+        </div>
+        <div class="field">
+          <label data-i18n="zc_interval">轮询间隔 (秒, 1-60)</label>
+          <input type="number" id="s-zc-interval" value="3" min="1" max="60" style="width:100%;">
+        </div>
+        <div class="field">
+          <label class="check-label" style="font-weight:600;">
+            <input type="checkbox" id="s-zc-auto-apply">
+            <span data-i18n="zc_auto_apply">自动报名</span>
+          </label>
+          <p class="hint" data-i18n="zc_auto_apply_hint">检测到新项目立即调用报名接口。需账号完成实名认证+完善资料+签署保密协议+技术考核，否则平台会拒绝。</p>
+        </div>
+        <div class="field">
+          <label class="check-label" style="font-weight:600;">
+            <input type="checkbox" id="s-zc-fast-poll">
+            <span data-i18n="zc_fast_poll">极速模式 (秒级轮询)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="src_settings_title">SRC监控 (补天/漏洞盒子)</h3>
+        <div class="field">
+          <label class="check-label" style="font-weight:600;">
+            <input type="checkbox" id="s-src-fast-poll">
+            <span data-i18n="src_fast_poll">秒级轮询</span>
+          </label>
+          <p class="hint" data-i18n="src_fast_poll_hint">以秒级间隔扫描补天和漏洞盒子，发现新企业/新项目立即通知。默认 5 秒，间隔越小越快但高频请求可能触发限流。</p>
+        </div>
+        <div class="field">
+          <label data-i18n="src_poll_seconds">轮询间隔 (秒, 1-60)</label>
+          <input type="number" id="s-src-poll-seconds" value="5" min="1" max="60" style="width:100%;">
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="update_title">// 在线更新</h3>
+        <div class="field">
+          <label data-i18n="update_repo_label">Git 仓库地址</label>
+          <input type="text" id="s-update-repo" data-i18n-placeholder="update_repo_ph" placeholder="https://github.com/user/repo.git" style="width:100%;">
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;">
+          <button class="btn-secondary btn-sm" id="update-save-repo-btn" data-i18n="update_save_repo">保存仓库</button>
+          <button class="btn-secondary btn-sm" id="update-check-btn" data-i18n="update_check_btn">检查更新</button>
+          <button class="btn-primary btn-sm" id="update-apply-btn" data-i18n="update_apply_btn" style="display:none;">应用更新</button>
+        </div>
+        <div id="update-status" style="margin-top:12px; font-size:0.8rem; line-height:1.6; white-space:pre-wrap;"></div>
+      </div>
+
+      <button class="btn-primary" id="save-settings-btn" data-i18n="settings_save_btn">保存设置</button>
+      <span id="settings-msg" style="margin-left:12px; font-size:0.85rem;"></span>
+    </div>
+  </section>
+</main>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
