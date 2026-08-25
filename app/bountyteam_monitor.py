@@ -483,10 +483,11 @@ _fast_state = {
 }
 
 # 各平台最小轮询间隔 (秒), 避免全部平台按同一个最小间隔跑
+# 物理下限: 单次 HTTP 往返 ~0.3-0.7s, 轮询间隔再小也受此限制; 过低只会触发风控
 PLATFORM_MIN_SECONDS = {
-    'bountyteam': 1,
-    'zc': 2,
-    'src': 5,
+    'bountyteam': 0.2,
+    'zc': 0.5,
+    'src': 2,
 }
 
 
@@ -505,7 +506,7 @@ def _get_poll_seconds(app) -> float:
         vals = [u.bountyteam_poll_seconds for u in User.query.all()
                 if u.bountyteam_fast_poll and u.bountyteam_token
                 and u.bountyteam_poll_seconds]
-        return max(1, min(vals)) if vals else 3.0
+        return max(0.2, min(vals)) if vals else 3.0
 
 
 def _fast_poll_loop(app):

@@ -43,7 +43,7 @@ def update_settings(current_user):
         current_user.bountyteam_fast_poll = bool(data['bountyteam_fast_poll'])
     if 'bountyteam_poll_seconds' in data:
         try:
-            current_user.bountyteam_poll_seconds = max(1, min(60, int(data['bountyteam_poll_seconds'])))
+            current_user.bountyteam_poll_seconds = max(0.2, min(60, float(data['bountyteam_poll_seconds'])))
         except (TypeError, ValueError):
             pass
     # 360 众测配置
@@ -51,7 +51,7 @@ def update_settings(current_user):
         current_user.zc_cookie = (data['zc_cookie'] or '').strip()
     if 'zc_interval_seconds' in data:
         try:
-            current_user.zc_interval_seconds = max(1, min(60, int(data['zc_interval_seconds'])))
+            current_user.zc_interval_seconds = max(0.5, min(60, float(data['zc_interval_seconds'])))
         except (TypeError, ValueError):
             pass
     if 'zc_auto_apply' in data:
@@ -63,7 +63,7 @@ def update_settings(current_user):
         current_user.src_fast_poll = bool(data['src_fast_poll'])
     if 'src_poll_seconds' in data:
         try:
-            current_user.src_poll_seconds = max(1, min(60, int(data['src_poll_seconds'])))
+            current_user.src_poll_seconds = max(2, min(60, float(data['src_poll_seconds'])))
         except (TypeError, ValueError):
             pass
     db.session.commit()
