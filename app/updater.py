@@ -119,7 +119,14 @@ def apply_update():
     branch = info['branch']
     rc, out, err = _run_auth(f'git pull origin {branch} --ff-only', timeout=180)
     if rc != 0:
-        return False, f'pull failed: {err or out}'
+        # 历史分叉 (服务器仓库独立 init 过, 与远程无共同祖先) → 强制对齐远程。
+        # data/ .env logs/ venv/ 均在 .gitignore, 不会被覆盖, 数据安全。
+        rc2, _, err2 = _run_auth(f'git fetch origin {branch}', timeout=120)
+        if rc2 != 0:
+            return False, f'pull failed: {err or out}'
+        rc3, out3, err3 = _run(f'git reset --hard origin/{branch}', timeout=60)
+        if rc3 != 0:
+            return False, f'reset failed: {err3 or out3}'
 
     rc, out, err = _run(
         f'{VENV_PYTHON} -m pip install -r requirements.txt -q', timeout=300
