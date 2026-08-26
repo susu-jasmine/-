@@ -69,24 +69,85 @@ def _headers(cookie: str) -> dict:
     return h
 
 
-def fetch_open_projects(cookie: str, pages: int = None):
+# ---------------------------------------------------------------------------
+# Cookie 滑动续期: 360 可能在响应里 Set-Cookie 下发新会话,
+# 必须接收并回写, 否则固定用旧 cookie 必然过期 (浏览器就是这样自动续的)。
+# ---------------------------------------------------------------------------
+# 进程级会话缓存: user_id -> requests.Session (带 cookie jar)
+import threading
+
+_sessions = {}
+_session_lock = threading.Lock()
+
+
+def _get_session(user, cookie: str):
+    """取(或建)该用户的 HTTP 会话; 若 cookie 变化则重置 jar。线程安全。"""
+    with _session_lock:
+        sess = _sessions.get(user.id)
+        jar_sig = getattr(sess, '_cookie_sig', None) if sess else None
+        if sess is None or jar_sig != cookie:
+            sess = requests.Session()
+            sess.headers.update(DEFAULT_HEADERS)
+            # 仅新建时用 DB cookie 填充 jar; 之后由 Set-Cookie 自动续期,
+            # 不能反复覆盖, 否则会冲掉服务器下发的新值
+            for pair in cookie.split(';'):
+                if '=' in pair:
+                    k, v = pair.split('=', 1)
+                    sess.cookies.set(k.strip(), v.strip(), domain='zhongce.360.net')
+            sess._cookie_sig = cookie
+            _sessions[user.id] = sess
+    return sess
+
+
+def _sync_cookie_back(user, sess) -> bool:
+    """把 jar 里的最新 cookie 回写到用户记录。返回是否更新。"""
+    new_cookie = '; '.join(
+        f'{c.name}={c.value}' for c in sess.cookies
+    )
+    old = (user.zc_cookie or '').strip()
+    if new_cookie and new_cookie != old:
+        user.zc_cookie = new_cookie
+        # 同步签名, 下次 _get_session 不因签名变化重建 jar
+        sess._cookie_sig = new_cookie
+        try:
+            from app import db
+            db.session.commit()
+            return True
+        except Exception:
+            from app import db
+            db.session.rollback()
+    return False
+
+
+def fetch_open_projects(cookie: str, pages: int = None, user=None):
     """拉取项目列表。返回 (results, status)。status: ok|expired|error。
 
+    传入 user 时使用 Session (自动接收 Set-Cookie 续期) 并回写最新 cookie。
     360 众测列表公开可见但需登录态; 返回字段名做宽容解析:
     - 列表可能在 data.list / data.data / data.rows / data 直接是数组
     - 项目 id: id / projectId / project_id
     """
     if not cookie:
         return [], 'expired'
+    sess = _get_session(user, cookie) if user else None
     max_pages = pages or MAX_PAGES
     results = []
     for page in range(1, max_pages + 1):
         try:
-            resp = requests.get(
-                API_LIST,
-                params={'page': page, 'pageSize': PAGE_SIZE},
-                headers=_headers(cookie), timeout=20,
-            )
+            if sess:
+                resp = sess.get(
+                    API_LIST,
+                    params={'page': page, 'pageSize': PAGE_SIZE},
+                    timeout=20,
+                )
+                # 接收续期: Set-Cookie 自动进 jar, 回写 DB
+                _sync_cookie_back(user, sess)
+            else:
+                resp = requests.get(
+                    API_LIST,
+                    params={'page': page, 'pageSize': PAGE_SIZE},
+                    headers=_headers(cookie), timeout=20,
+                )
         except Exception:
             return results, 'error'
         if resp.status_code == 401:
@@ -151,19 +212,25 @@ def _get_id(it) -> int:
     return None
 
 
-def apply_project(cookie: str, project_id: int):
+def apply_project(cookie: str, project_id: int, user=None):
     """调用报名接口。返回 (ok, errmsg, status)。status: ok|failed|expired|error。
 
     报名前平台有前置检查 (实名/资料/协议/考核), 失败时 errmsg 带原因。
+    传入 user 时走 Session (接收 Set-Cookie 续期并回写)。
     """
     if not cookie:
         return False, '未配置 Cookie', 'expired'
+    sess = _get_session(user, cookie) if user else None
     try:
-        resp = requests.post(
-            API_JOIN,
-            data={'projectId': project_id},
-            headers=_headers(cookie), timeout=20,
-        )
+        if sess:
+            resp = sess.post(API_JOIN, data={'projectId': project_id}, timeout=20)
+            _sync_cookie_back(user, sess)
+        else:
+            resp = requests.post(
+                API_JOIN,
+                data={'projectId': project_id},
+                headers=_headers(cookie), timeout=20,
+            )
     except Exception:
         return False, '网络请求异常', 'error'
     if resp.status_code == 401:
@@ -194,7 +261,7 @@ def scan_zc(user, light: bool = False) -> tuple:
         _record_health(user, _TOKEN_EXPIRED, '未配置 cookie')
         return 0, 0
 
-    items, status = fetch_open_projects(cookie, pages=1 if light else None)
+    items, status = fetch_open_projects(cookie, pages=1 if light else None, user=user)
     if status == 'expired':
         _handle_expired(user)
         return 0, 0
@@ -318,7 +385,7 @@ def scan_zc(user, light: bool = False) -> tuple:
         from concurrent.futures import ThreadPoolExecutor
 
         def _do_apply(p):
-            return p.project_id, apply_project(cookie, p.project_id)
+            return p.project_id, apply_project(cookie, p.project_id, user=user)
 
         expired_hit = False
         with ThreadPoolExecutor(max_workers=min(5, len(candidates) or 1)) as ex:
