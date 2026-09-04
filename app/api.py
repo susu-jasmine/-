@@ -26,12 +26,19 @@ def update_settings(current_user):
         'smtp_user', 'smtp_pass', 'smtp_from',
         'notify_email', 'notify_wechat', 'src_interval_hours',
     ]
+    # ***开头是脱敏回显值, 提交时忽略以防覆盖真实凭据
+    _masked_fields = ('pushplus_token', 'smtp_pass')
     for f in fields:
         if f in data:
-            setattr(current_user, f, data[f])
-    # BountyTeam 配置
+            v = data[f]
+            if f in _masked_fields and isinstance(v, str) and v.strip().startswith('***'):
+                continue
+            setattr(current_user, f, v)
+    # BountyTeam 配置 (***开头是脱敏回显, 忽略以防覆盖真实 token)
     if 'bountyteam_token' in data:
-        current_user.bountyteam_token = (data['bountyteam_token'] or '').strip()
+        _tok = (data['bountyteam_token'] or '').strip()
+        if not _tok.startswith('***'):
+            current_user.bountyteam_token = _tok
     if 'bountyteam_interval_minutes' in data:
         try:
             current_user.bountyteam_interval_minutes = max(1, int(data['bountyteam_interval_minutes']))
@@ -46,9 +53,11 @@ def update_settings(current_user):
             current_user.bountyteam_poll_seconds = max(0.2, min(60, float(data['bountyteam_poll_seconds'])))
         except (TypeError, ValueError):
             pass
-    # 360 众测配置
+    # 360 众测配置 (***开头是脱敏回显, 忽略以防覆盖真实 cookie)
     if 'zc_cookie' in data:
-        current_user.zc_cookie = (data['zc_cookie'] or '').strip()
+        _ck = (data['zc_cookie'] or '').strip()
+        if not _ck.startswith('***'):
+            current_user.zc_cookie = _ck
     if 'zc_interval_seconds' in data:
         try:
             current_user.zc_interval_seconds = max(0.5, min(60, float(data['zc_interval_seconds'])))

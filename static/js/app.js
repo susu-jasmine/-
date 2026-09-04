@@ -493,7 +493,6 @@
 
   document.getElementById('save-settings-btn').addEventListener('click', async () => {
     const body = {
-      pushplus_token: document.getElementById('s-pushplus').value.trim(),
       email: document.getElementById('s-email').value.trim(),
       smtp_host: document.getElementById('s-smtp-host').value.trim(),
       smtp_port: parseInt(document.getElementById('s-smtp-port').value) || 587,
@@ -513,14 +512,18 @@
       src_fast_poll: document.getElementById('s-src-fast-poll').checked,
       src_poll_seconds: parseInt(document.getElementById('s-src-poll-seconds').value) || 5,
     };
-    // token 仅在用户实际输入了内容时提交 (避免把 *** 覆盖回库)
+    // token 仅在用户实际输入了非脱敏值时提交 (***开头是脱敏回显, 提交会覆盖真实值)
+    const pushToken = document.getElementById('s-pushplus').value.trim();
+    if (pushToken && !pushToken.startsWith('***')) {
+      body.pushplus_token = pushToken;
+    }
     const btToken = document.getElementById('s-bounty-token').value.trim();
-    if (btToken && btToken !== '***') {
+    if (btToken && !btToken.startsWith('***')) {
       body.bountyteam_token = btToken;
     }
     // 360 cookie 同样: 仅在输入了非脱敏值时提交
     const zcCookie = document.getElementById('s-zc-cookie').value.trim();
-    if (zcCookie && zcCookie !== '***') {
+    if (zcCookie && !zcCookie.startsWith('***')) {
       body.zc_cookie = zcCookie;
     }
     const resp = await api('/api/settings', { method: 'PUT', body: JSON.stringify(body) });
